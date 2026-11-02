@@ -19,13 +19,28 @@ from sklearn.metrics.pairwise import cosine_similarity
 from transformers import pipeline
 from transformers.pipelines.base import Pipeline
 
-docs = [
+### Constants
+RAG_DOCS = [
     {"id": "1", "txt": "Python is a high-level, interpreted programming language. It was created by Guido van Rossum and first released in 1991. Python emphasizes code readability with its notable use of significant whitespace."},
     {"id": "2", "txt": "FastAPI is a modern, fast web framework for building APIs with Python 3.7+. It is based on standard Python type hints and provides automatic API documentation. FastAPI is one of the fastest Python frameworks available."},
     {"id": "3", "txt": "Machine learning is a subset of artificial intelligence that enables systems to learn and improve from experience. It uses algorithms to parse data, learn from it, and make predictions or decisions without being explicitly programmed."},
     {"id": "4", "txt": "RAG (Retrieval-Augmented Generation) combines information retrieval with text generation. It retrieves relevant documents from a knowledge base and uses them to generate informed, contextual answers. This approach improves accuracy and reduces hallucinations."},
     {"id": "5", "txt": "Vector databases store data as high-dimensional vectors and enable efficient similarity search. They are essential for modern AI applications, particularly in semantic search and retrieval systems. Common examples include Pinecone, Weaviate, and Chroma."}
 ]
+## Evaluation thresholds
+MIN_ANSWER_LENGTH = 20
+LOW_RELEVANCE_THRESHOLD = 0.1
+VALID_SCORE_THRESHOLD = 0.6
+MAX_PROBLEMS = 3
+
+## Evaluation penalties
+NO_DOCS_PENALTY = 0.4
+NO_INFO_PENALTY = 0.5
+SHORT_ANSWER_PENALTY = 0.3
+NO_REFERENCES_PENALTY = 0.7
+LOW_RELEVANCE_PENALTY = 0.6
+
+### Refactored Functions
 
 def parse_args():
     """Parse CLI arguments."""
@@ -58,7 +73,8 @@ def parse_args():
 
     return args
 
-
+## Let's make this a function so we can handle
+## Failed loads better, and configure max_new_tokens
 def load_model(model_name: str="gpt2", max_new_tokens=256) -> Pipeline:
     """Load model from HuggingFace"""
     try:
@@ -69,6 +85,7 @@ def load_model(model_name: str="gpt2", max_new_tokens=256) -> Pipeline:
     except Exception as e:
         print(f"Error loading model \"{model_name}\": {e}")
         sys.exit(1)
+
 
 def retrieve_documents(question: str, docs: list[dict], top_k: int=3) -> list[dict]:
     """Get top_k documents with positive tidf cosine similarity"""
@@ -129,7 +146,7 @@ def validate_output(answer: str, retrieved_docs: list[dict]) -> tuple[bool, floa
     """Evaluate answer quality"""
     #Could add args here, even up to the CLI
     #For which categories we want to score on
-    #low criticality tho
+    #low criticality though
     #Probably should add thresholds as constants
     #or configs somewhere
     problems = []
@@ -138,34 +155,31 @@ def validate_output(answer: str, retrieved_docs: list[dict]) -> tuple[bool, floa
     # If no documents were retrieved, return immediately with 'no docs' penalty
     if len(retrieved_docs) == 0:
         problems.append("No documents retrieved")
-        score = score * 0.4
+        score = score * NO_DOCS_PENALTY
         return False, score, problems
 
     if "idk" in answer.lower():
         problems.append("No information in provided documents.")
-        score = score * 0.5
+        score = score * NO_INFO_PENALTY
 
-    if len(answer) < 20:
+    if len(answer) < MIN_ANSWER_LENGTH:
         problems.append("Answer was too short.")
-        score = score * 0.3
+        score = score * SHORT_ANSWER_PENALTY
 
     refs = re.findall(r'\[(\d+)\]', answer)
 
     if len(retrieved_docs) > 0 and len(refs) == 0:
         problems.append("No valid references found.")
-        score = score * 0.7
+        score = score * NO_REFERENCES_PENALTY
 
     #got rid of loop with sum
     avg = sum(r["score"] for r in retrieved_docs) / len(retrieved_docs)
 
-    if avg < 0.1:
+    if avg < LOW_RELEVANCE_THRESHOLD:
         problems.append("Low Relevance")
-        score = score * 0.6
+        score = score * LOW_RELEVANCE_PENALTY
 
-    if score > 0.6 and len(problems) < 3:
-        is_valid = True
-    else:
-        is_valid = False
+    is_valid = (score > VALID_SCORE_THRESHOLD) and (len(problems) < MAX_PROBLEMS)
 
     return is_valid, score, problems
 
@@ -215,7 +229,7 @@ def main():
     args = parse_args()
 
     #1. Retrieve relevant documents
-    retrieved_docs = retrieve_documents(args.question, docs, top_k=args.top_k)
+    retrieved_docs = retrieve_documents(args.question, RAG_DOCS, top_k=args.top_k)
 
     #2. Generate answer
     if len(retrieved_docs) > 0:
