@@ -54,6 +54,10 @@ def parse_args():
         action="store_true",
         help="Print the output into json format, (default: False)")
 
+    args = parser.parse_args()
+    
+    return args
+
 
 def load_model(model_name: str="gpt2", max_new_tokens=256) -> Pipeline:
     """Load model from HuggingFace"""
