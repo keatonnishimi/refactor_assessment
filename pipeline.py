@@ -246,9 +246,9 @@ def print_results(
             "answer": answer,
             "citations": retrieved_docs,
             "critique": {
-                "Valid: ": is_valid,
-                "Score: ": score,
-                "Problems: ": problems,
+                "valid": is_valid,
+                "score": score,
+                "problems": problems,
             },
         }
         print(json.dumps(result, indent=2))
