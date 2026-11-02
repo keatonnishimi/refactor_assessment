@@ -16,7 +16,8 @@ import json
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from transformers import Pipeline
+from transformers import pipeline
+from transformers.pipelines.base import Pipeline
 
 def parse_args():
     """Parse CLI arguments."""
@@ -66,7 +67,7 @@ def load_model(model_name: str="gpt2", max_new_tokens=256) -> Pipeline:
     """Load model from HuggingFace"""
     try:
         print("Loading Model...")
-        llm = Pipeline("text-generation", model=model_name, max_new_tokens=max_new_tokens)
+        llm = pipeline("text-generation", model=model_name, max_new_tokens=max_new_tokens)
         print("Model Loaded successfully!")
         return llm
     except Exception as e:
@@ -145,44 +146,48 @@ def call_model(question: str, retrieved_docs: list[dict], llm: Pipeline):
 
     return answer
 
-def validate_output():
-    global problems, score, is_valid
+
+def validate_output(answer: str, retrieved_docs: list[dict]) -> tuple[bool, float, list[str]]:
+    """Evaluate answer quality"""
+    #Could add args here, even up to the CLI
+    #For which categories we want to score on
+    #low criticality tho
     problems = []
     score = 1.0
 
+    # If no documents were retrieved, return immediately with 'no docs' penalty
+    if len(retrieved_docs) == 0:
+        problems.append("No documents retrieved")
+        score = score * 0.4
+        return False, score, problems
+
     if "idk" in answer.lower():
-        problems.append("no info")
+        problems.append("No information in provided documents.")
         score = score * 0.5
 
     if len(answer) < 20:
-        problems.append("short")
+        problems.append("Answer was too short.")
         score = score * 0.3
 
     refs = re.findall(r'\[(\d+)\]', answer)
 
-    if len(retrieved_docs) > 0:
-        if len(refs) == 0:
-            problems.append("no refs")
-            score = score * 0.7
+    if len(retrieved_docs) > 0 and len(refs) == 0:
+        problems.append("No valid references found.")
+        score = score * 0.7
 
-        avg = 0
-        for r in retrieved_docs:
-            avg += r["score"]
-        avg = avg / len(retrieved_docs)
+    #got rid of loop with sum
+    avg = sum(r["score"] for r in retrieved_docs) / len(retrieved_docs)
 
-        if avg < 0.1:
-            problems.append("low relevance")
-            score = score * 0.6
+    if avg < 0.1:
+        problems.append("Low Relevance")
+        score = score * 0.6
 
-    if score > 0.6:
-        if len(problems) < 3:
-            is_valid = True
-        else:
-            is_valid = False
+    if score > 0.6 and len(problems) < 3:
+        is_valid = True
     else:
         is_valid = False
 
-validate_output()
+    return is_valid, score, problems
 
 
 #put all this into print_results()
@@ -231,7 +236,7 @@ def main():
         #that we didn't find docs relevant for whatever reason
 
     #3. Validate
-    validate_output()
+    is_valid, score, problems = validate_output(answer, retrieved_docs)
 
     #4. Print
     print_results()
