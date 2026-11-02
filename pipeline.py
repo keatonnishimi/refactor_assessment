@@ -16,7 +16,7 @@ import json
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from transformers import pipeline
+from transformers import Pipeline
 
 def parse_args():
     """Parse CLI arguments."""
@@ -62,11 +62,11 @@ docs = [
     {"id": "5", "txt": "Vector databases store data as high-dimensional vectors and enable efficient similarity search. They are essential for modern AI applications, particularly in semantic search and retrieval systems. Common examples include Pinecone, Weaviate, and Chroma."}
 ]
 
-def load_model(model_name: str="gpt2", max_new_tokens=256):
+def load_model(model_name: str="gpt2", max_new_tokens=256) -> Pipeline:
     """Load model from HuggingFace"""
     try:
         print("Loading Model...")
-        llm = pipeline("text-generation", model=model_name, max_new_tokens=max_new_tokens)
+        llm = Pipeline("text-generation", model=model_name, max_new_tokens=max_new_tokens)
         print("Model Loaded successfully!")
         return llm
     except Exception as e:
@@ -101,9 +101,6 @@ def retrieve_documents(question: str, docs: list[dict], top_k: int=3) -> list[di
 
     return retrieved_docs
 
-retrieved_docs = retrieve_documents(question=args.question, docs=docs, top_k=args.top_k)
-
-
 
 #probably move most of this into print_results()
 if len(retrieved_docs) == 0:
@@ -121,25 +118,32 @@ if len(retrieved_docs) == 0:
     sys.exit(0)
 
 
+def call_model(question: str, retrieved_docs: list[dict], llm: Pipeline):
+    """Generate answer from docs and question"""
 
+    context = ""
+    for counter, retrieved_doc in enumerate(retrieved_docs, start=1):
+        doc_text = retrieved_doc["doc"]["txt"]
+        context += f"[{counter}] {doc_text}\n\n"
 
-def call_model():
-    global answer, temp_storage
-    ctx = ""
-    counter = 0
-    for r in retrieved_docs:
-        counter += 1
-        ctx += f"[{counter}] {r['doc']['txt']}\n\n"
+    temp_storage["context"] = context
 
-    temp_storage["context"] = ctx
-    prompt = "Context:\n{}\nQuestion: {}\n\nAnswer the question based only on the context above. Cite sources using [1], [2], etc. Be concise.\n\nAnswer:".format(ctx, temp_storage['question'])
-    output = llm(prompt)
-    answer = output[0]['generated_text'].split("Answer:")[-1].strip()
+    prompt = (
+        f"Context:\n{context}\n"
+        f"Question: {question}\n\n"
+        f"Answer the question based only on the context above. Cite sources using [1], [2], etc. Be concise.\n\n"
+        f"Answer:"
+    )
+
+    output = llm(prompt, return_full_text=False)
+    answer = output[0]['generated_text'].strip()
 
     if answer == "":
         answer = "idk"
+        #need to write better fallback
+        #describing failure modes here
 
-call_model()
+    return answer
 
 def validate_output():
     global problems, score, is_valid
@@ -219,16 +223,18 @@ def main():
     #2. Generate answer
     if len(retrieved_docs) > 0:
         llm = load_model()
-        #call_model(llm)
+        answer = call_model(args.question, retrieved_docs, llm)
     else:
         answer = "idk"
         #need to write a better fallback
+        #this should say something about the exception
+        #that we didn't find docs relevant for whatever reason
 
     #3. Validate
-    #validate_output()
+    validate_output()
 
     #4. Print
-    #print_results()
+    print_results()
 
 if __name__ == "__main__":
     main()
