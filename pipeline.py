@@ -87,6 +87,13 @@ def parse_args():
         help="Print the output into json format, (default: False)",
     )
 
+    parser.add_argument(  # Optional
+        "--model",
+        type=str,
+        default="gpt2",
+        help="LLM to use (default: \"gpt2\")"
+    )
+
     args = parser.parse_args()
 
     return args
@@ -258,17 +265,17 @@ def main():
     args = parse_args()
 
     # 1. Retrieve relevant documents
-    retrieved_docs = retrieve_documents(args.question, RAG_DOCS, top_k=args.top_k)
+    retrieved_docs = retrieve_documents(question=args.question, docs=RAG_DOCS, top_k=args.top_k)
 
     # 2. Generate answer
     if len(retrieved_docs) > 0:
-        llm = load_model()
-        answer = call_model(args.question, retrieved_docs, llm)
+        llm = load_model(model_name=args.model)
+        answer = call_model(question=args.question, retreived_docs=retrieved_docs, llm=llm)
     else:
         answer = "UNKNOWN: No documents retrieved. Try re-phrasing your question or increasing --top_k"
 
     # 3. Validate
-    is_valid, score, problems = validate_output(answer, retrieved_docs)
+    is_valid, score, problems = validate_output(answer=answer, retrieved_docs=retrieved_docs)
 
     # 4. Print
     print_results(
