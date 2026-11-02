@@ -8,14 +8,15 @@ from the command line with options to specify the number of documents to retriev
 
 # minimal rag
 
+import argparse
 import sys
-import numpy as np
 import re
 import json
+
+import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from transformers import pipeline
-import argparse
 
 ### Argument Parser
 # Should be easier to maintain than sys.argv, especially if we add more args later
@@ -24,7 +25,7 @@ import argparse
 # but that may add non-trivial overhead
 parser = argparse.ArgumentParser(description="Ask a question! Usage: python pipeline.py \"<question>\" [-k NUM] [--json]")
 parser.add_argument("question", help="Your question - make sure to put \' or \" around your question!")
-parser.add_argument("-k", "--top-k", type=int, default=3, help="Number of relevant docs to use, (default: 3") #Optional
+parser.add_argument("-k", "--top-k", dest=top_k, type=int, default=3, help="Number of relevant docs to use, (default: 3") #Optional
 parser.add_argument("--json", action="store_true", help="Print the output into json format, (default: False)") #Optional
 
 args=parser.parse_args()
@@ -53,23 +54,35 @@ docs = [
     {"id": "5", "txt": "Vector databases store data as high-dimensional vectors and enable efficient similarity search. They are essential for modern AI applications, particularly in semantic search and retrieval systems. Common examples include Pinecone, Weaviate, and Chroma."}
 ]
 
-vectorizer = TfidfVectorizer()
-vectors = vectorizer.fit_transform([x["txt"] for x in docs])
+#better name, types, default
+#check for positive k
+#use a return instead of modifying globals
+#can be used outside of linear execution now
+def retrieve_documents(question: str, docs: list[dict], top_k: int=3) -> list[dict]:
+    """Get top_k documents with positive tidf cosine similarity"""
 
-def get_data():
-    global retrieved_docs, temp_storage
-    query_vec = vectorizer.transform([args.question])
-    similarities = cosine_similarity(query_vec, vectors)[0]
-    indices = np.argsort(similarities)[-args.k:][::-1]
-    temp_storage["sims"] = similarities
+    #make sure args exist, check top_k greater than 0
+    if not docs or top_k<=0 or not question.strip():
+        return []
 
-    for i in indices:
+    vectorizer = TfidfVectorizer()
+    doc_vectors = vectorizer.fit_transform([doc["txt"] for doc in docs])
+    query_vector = vectorizer.transform([question])
+
+    similarities = cosine_similarity(query_vector, doc_vectors)[0]
+    ranked_indices = np.argsort(similarities)[::-1][:top_k]
+
+    retrieved_docs = []
+    for i in ranked_indices:
         if similarities[i] > 0:
-            retrieved_docs.append({"doc": docs[i], "score": float(similarities[i])})
-            if len(retrieved_docs) >= args.k:
-                break
+            retrieved_docs.append({
+                "doc": docs[i],
+                "score": float(similarities[i]),
+            })
 
-get_data()
+    return retrieved_docs
+
+retrieved_docs = retrieve_documents(question=args.question, docs=docs, top_k=args.top_k)
 
 if len(retrieved_docs) == 0:
     answer = "idk"
