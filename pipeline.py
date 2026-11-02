@@ -67,7 +67,7 @@ def parse_args():
     # out of the box. Optionally, can look into typer for more functionality
     # but that may add non-trivial overhead
     parser = argparse.ArgumentParser(
-        description='Ask a question! Usage: python pipeline.py "<question>" [-k NUM] [--json]'
+        description='Ask a question! Usage: python pipeline.py "<question>" [-k NUM] [--json] [--model MODEL_NAME] [--similarity FLOAT]'
     )
 
     parser.add_argument(
