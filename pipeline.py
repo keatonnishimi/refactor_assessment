@@ -15,6 +15,7 @@ import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from transformers import pipeline
+import argparse
 
 try:
     print("loading model...")
@@ -34,50 +35,38 @@ docs = [
 vectorizer = TfidfVectorizer()
 vectors = vectorizer.fit_transform([x["txt"] for x in docs])
 
+### Argument Parser
+# Should be easier to maintain than sys.argv, especially if we add more args later
+# While loop was funky. argparse adds minimal overhead and gives us better arg handling
+# out of the box. Optionally, can look into typer for more functionality 
+# but that may add non-trivial overhead
+parser = argparse.ArgumentParser(description="Ask a question! Usage: python pipeline.py \"<question>\" [-k NUM] [--json]")
+parser.add_argument("question", help="Your question - make sure to put \' or \" around your question!")
+parser.add_argument("-k", "--top-k", type=int, default=3, help="Number of relevant docs to use, (default: 3") #Optional
+parser.add_argument("--json", action="store_true", help="Print the output into json format, (default: False)") #Optional
+
+args=parser.parse_args()
+
+# These were duplicated for some reason
+# Can just construct temp storage with the question
 retrieved_docs = []
 answer = ""
 problems = []
 score = 1.0
 is_valid = False
-temp_storage = {}
-
-if len(sys.argv) < 2:
-    print("usage: python minimal-rag.py <question> [-k NUM] [--json]")
-    print("example: python minimal-rag.py 'What is RAG?' -k 2 --json")
-    sys.exit(1)
-
-question = sys.argv[1]
-k = 3
-use_json = False
-i = 2
-
-while i < len(sys.argv):
-    if sys.argv[i] == "-k":
-        k = int(sys.argv[i+1])
-        i += 2
-    elif sys.argv[i] == "--json":
-        use_json = True
-        i += 1
-    else:
-        i += 1
-
-retrieved_docs = []
-answer = ""
-problems = []
-score = 1.0
-temp_storage["question"] = question
+temp_storage = {"question": args.question}
 
 def get_data():
     global retrieved_docs, temp_storage
-    query_vec = vectorizer.transform([question])
+    query_vec = vectorizer.transform([args.question])
     similarities = cosine_similarity(query_vec, vectors)[0]
-    indices = np.argsort(similarities)[-k:][::-1]
+    indices = np.argsort(similarities)[-args.k:][::-1]
     temp_storage["sims"] = similarities
 
     for i in indices:
         if similarities[i] > 0:
             retrieved_docs.append({"doc": docs[i], "score": float(similarities[i])})
-            if len(retrieved_docs) >= k:
+            if len(retrieved_docs) >= args.k:
                 break
 
 get_data()
@@ -87,12 +76,12 @@ if len(retrieved_docs) == 0:
     problems.append("no docs")
     score = score * 0.4
     is_valid = False
-    print("\nQ: {}".format(question))
+    print("\nQ: {}".format(args.question))
     print(f"\nA: {answer}\n")
     print("Citations: None")
     print("\nCritique: ISSUES (confidence: {:.2f})".format(score))
     print("Problems: %s" % ', '.join(problems))
-    if use_json:
+    if args.json:
         print(json.dumps({"answer": answer, "citations": retrieved_docs, "critique": {"ok": is_valid, "score": score, "problems": problems}}, indent=2))
     sys.exit(0)
 
@@ -153,7 +142,7 @@ def validate_output():
 
 validate_output()
 
-print("\nQ: {}".format(question))
+print("\nQ: {}".format(args.question))
 print(f"\nA: {answer}\n")
 print("Citations:")
 
@@ -177,5 +166,5 @@ result = {
     "critique": {"ok": is_valid, "score": score, "problems": problems}
 }
 
-if use_json:
+if args.json:
     print(json.dumps(result, indent=2))
