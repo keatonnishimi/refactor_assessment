@@ -18,17 +18,32 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from transformers import pipeline
 
-### Argument Parser
-# Should be easier to maintain than sys.argv, especially if we add more args later
-# While loop was funky. argparse adds minimal overhead and gives us better arg handling
-# out of the box. Optionally, can look into typer for more functionality 
-# but that may add non-trivial overhead
-parser = argparse.ArgumentParser(description="Ask a question! Usage: python pipeline.py \"<question>\" [-k NUM] [--json]")
-parser.add_argument("question", help="Your question - make sure to put \' or \" around your question!")
-parser.add_argument("-k", "--top-k", dest=top_k, type=int, default=3, help="Number of relevant docs to use, (default: 3") #Optional
-parser.add_argument("--json", action="store_true", help="Print the output into json format, (default: False)") #Optional
-
-args=parser.parse_args()
+def parse_args():
+    """Parse CLI arguments."""
+    # Should be easier to maintain than sys.argv, especially if we add more args later
+    # While loop was funky. argparse adds minimal overhead and gives us better arg handling
+    # out of the box. Optionally, can look into typer for more functionality 
+    # but that may add non-trivial overhead
+    parser = argparse.ArgumentParser(
+        description="Ask a question! Usage: python pipeline.py \"<question>\" [-k NUM] [--json]"
+        )
+    
+    parser.add_argument(
+        "question", 
+        help="Your question - make sure to put \' or \" around your question!"
+        )
+    parser.add_argument(#Optional
+        "-k",
+        "--top-k",
+        dest="top_k",
+        type=int,
+        default=3,
+        help="Number of relevant docs to use, (default: 3")
+    
+    parser.add_argument(#Optional
+        "--json",
+        action="store_true",
+        help="Print the output into json format, (default: False)")
 
 # These were duplicated for some reason
 # Can just construct temp storage with the question
@@ -54,12 +69,12 @@ docs = [
     {"id": "5", "txt": "Vector databases store data as high-dimensional vectors and enable efficient similarity search. They are essential for modern AI applications, particularly in semantic search and retrieval systems. Common examples include Pinecone, Weaviate, and Chroma."}
 ]
 
-#better name, types, default
-#check for positive k
-#use a return instead of modifying globals
-#can be used outside of linear execution now
 def retrieve_documents(question: str, docs: list[dict], top_k: int=3) -> list[dict]:
     """Get top_k documents with positive tidf cosine similarity"""
+    #better name, types, default
+    #check for positive k
+    #use a return instead of modifying globals
+    #can be used outside of linear execution now
 
     #make sure args exist, check top_k greater than 0
     if not docs or top_k<=0 or not question.strip():
@@ -181,3 +196,19 @@ result = {
 
 if args.json:
     print(json.dumps(result, indent=2))
+
+
+def main():
+    args = parse_args()
+
+    #1. Retrieve relevant documents
+    retrieved_docs = retrieve_documents(args.question, docs, top_k=args.top_k)
+
+    #2. Generate answer
+
+    #3. Validate
+
+    #4. Print
+
+if __name__ == "__main__":
+    main()
