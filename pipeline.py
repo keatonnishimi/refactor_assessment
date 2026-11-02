@@ -9,9 +9,9 @@ from the command line with options to specify the number of documents to retriev
 # minimal rag
 
 import argparse
-import sys
-import re
 import json
+import re
+import sys
 
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -103,7 +103,9 @@ def load_model(model_name: str = "gpt2", max_new_tokens=256) -> Pipeline:
         )
         print("Model Loaded successfully!")
         return llm
-    except Exception as e:
+    # ignore BLE001 blind exception "Exception".
+    # This is okay for model loader to catch whatever error pipeline() could throw
+    except Exception as e:  # noqa : BLE001
         print(f'Error loading model "{model_name}": {e}')
         sys.exit(1)
 
