@@ -103,22 +103,6 @@ def retrieve_documents(question: str, docs: list[dict], top_k: int=3) -> list[di
     return retrieved_docs
 
 
-#probably move most of this into print_results()
-if len(retrieved_docs) == 0:
-    answer = "idk"
-    problems.append("no docs")
-    score = score * 0.4
-    is_valid = False
-    print("\nQ: {}".format(args.question))
-    print(f"\nA: {answer}\n")
-    print("Citations: None")
-    print("\nCritique: ISSUES (confidence: {:.2f})".format(score))
-    print("Problems: %s" % ', '.join(problems))
-    if args.json:
-        print(json.dumps({"answer": answer, "citations": retrieved_docs, "critique": {"ok": is_valid, "score": score, "problems": problems}}, indent=2))
-    sys.exit(0)
-
-
 def call_model(question: str, retrieved_docs: list[dict], llm: Pipeline):
     """Generate answer from docs and question"""
 
@@ -152,6 +136,8 @@ def validate_output(answer: str, retrieved_docs: list[dict]) -> tuple[bool, floa
     #Could add args here, even up to the CLI
     #For which categories we want to score on
     #low criticality tho
+    #Probably should add thresholds as constants
+    #or configs somewhere
     problems = []
     score = 1.0
 
@@ -190,34 +176,46 @@ def validate_output(answer: str, retrieved_docs: list[dict]) -> tuple[bool, floa
     return is_valid, score, problems
 
 
-#put all this into print_results()
-print("\nQ: {}".format(args.question))
-print(f"\nA: {answer}\n")
-print("Citations:")
+def print_results(
+        question: str, 
+        answer: str, 
+        retrieved_docs: list[dict],
+        is_valid: bool,
+        score: float,
+        problems: list[str],
+        use_json=False):
+    """Display summary and json output"""
+    print(f"\nQ: {question}")
+    print(f"\nA: {answer}\n")
 
-for r in retrieved_docs:
-    doc_text = r['doc']['txt']
-    if len(doc_text) > 80:
-        doc_text = doc_text[:80] + "..."
-    print("  [{}] (score: {:.3f}) {}".format(r['doc']['id'], r['score'], doc_text))
+    if len(retrieved_docs) == 0:
+        print("Citations: None")
+    else:
+        print("Citations:")
+        for r in retrieved_docs:
+            doc_text = r['doc']['txt']
+            if len(doc_text) > 80:
+                doc_text = doc_text[:80] + "..."
+            print("  [{}] (score: {:.3f}) {}".format(r['doc']['id'], r['score'], doc_text))
 
-if is_valid:
-    print("\nCritique: OK (confidence: {:.2f})".format(score))
-else:
-    print(f"\nCritique: ISSUES (confidence: {score:.2f})")
+    #can do this all at once
+    validity = "OK" if is_valid else "ISSUES"
+    print(f"\nCritique: {validity} (confidence: {score:.2f})")
 
-if len(problems) > 0:
-    print("Problems: %s" % ', '.join(problems))
+    if len(problems) > 0:
+        print(f"Problems: {", ".join(problems)}")
 
-result = {
-    "answer": answer,
-    "citations": retrieved_docs,
-    "critique": {"ok": is_valid, "score": score, "problems": problems}
-}
-
-if args.json:
-    print(json.dumps(result, indent=2))
-
+    if use_json:
+        result = {
+            "answer": answer,
+            "citations": retrieved_docs,
+            "critique": {
+                "Valid: ": is_valid,
+                "Score: ": score,
+                "Problems: ": problems,
+            }
+        }
+        print(json.dumps(result, indent=2))
 
 def main():
     args = parse_args()
@@ -239,7 +237,15 @@ def main():
     is_valid, score, problems = validate_output(answer, retrieved_docs)
 
     #4. Print
-    print_results()
+    print_results(
+        question = args.question,
+        answer=answer,
+        retrieved_docs=retrieved_docs,
+        is_valid=is_valid,
+        score=score,
+        problems=problems,
+        use_json=args.json,
+    )
 
 if __name__ == "__main__":
     main()
