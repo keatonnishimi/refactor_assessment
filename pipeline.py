@@ -60,6 +60,7 @@ LOW_RELEVANCE_PENALTY = 0.6
 
 ### Refactored Functions
 
+
 def parse_args():
     """Parse CLI arguments."""
     # Should be easier to maintain than sys.argv, especially if we add more args later
@@ -90,17 +91,14 @@ def parse_args():
     )
 
     parser.add_argument(  # Optional
-        "--model",
-        type=str,
-        default="gpt2",
-        help="LLM to use (default: \"gpt2\")"
+        "--model", type=str, default="gpt2", help='LLM to use, try \"Qwen/Qwen2.5-0.5B-Instruct\", (default: "gpt2")'
     )
 
-    parser.add_argument( # Optional
+    parser.add_argument(  # Optional
         "--similarity",
         type=float,
         default=MIN_SIMILARITY_SCORE,
-        help="Minimum similarity score to check against documents, (default: 0.15)"
+        help="Minimum similarity score to check against documents, (default: 0.15)",
     )
 
     args = parser.parse_args()
@@ -126,7 +124,12 @@ def load_model(model_name: str = "gpt2", max_new_tokens=256) -> Pipeline:
         sys.exit(1)
 
 
-def retrieve_documents(question: str, docs: list[dict], top_k: int = 3, min_similarity: float=MIN_SIMILARITY_SCORE) -> list[dict]:
+def retrieve_documents(
+    question: str,
+    docs: list[dict],
+    top_k: int = 3,
+    min_similarity: float = MIN_SIMILARITY_SCORE,
+) -> list[dict]:
     """Get top_k documents with positive tidf cosine similarity"""
     # better name, types, default
     # check for positive k
@@ -274,17 +277,26 @@ def main():
     args = parse_args()
 
     # 1. Retrieve relevant documents
-    retrieved_docs = retrieve_documents(question=args.question, docs=RAG_DOCS, top_k=args.top_k, min_similarity=MIN_SIMILARITY_SCORE)
+    retrieved_docs = retrieve_documents(
+        question=args.question,
+        docs=RAG_DOCS,
+        top_k=args.top_k,
+        min_similarity=MIN_SIMILARITY_SCORE,
+    )
 
     # 2. Generate answer
     if len(retrieved_docs) > 0:
         llm = load_model(model_name=args.model)
-        answer = call_model(question=args.question, retrieved_docs=retrieved_docs, llm=llm)
+        answer = call_model(
+            question=args.question, retrieved_docs=retrieved_docs, llm=llm
+        )
     else:
         answer = "UNKNOWN: No documents retrieved. Try re-phrasing your question or increasing --top_k"
 
     # 3. Validate
-    is_valid, score, problems = validate_output(answer=answer, retrieved_docs=retrieved_docs)
+    is_valid, score, problems = validate_output(
+        answer=answer, retrieved_docs=retrieved_docs
+    )
 
     # 4. Print
     print_results(
