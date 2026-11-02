@@ -42,6 +42,9 @@ RAG_DOCS = [
         "txt": "Vector databases store data as high-dimensional vectors and enable efficient similarity search. They are essential for modern AI applications, particularly in semantic search and retrieval systems. Common examples include Pinecone, Weaviate, and Chroma.",
     },
 ]
+## Prompt thresholds
+MIN_SIMILARITY_SCORE = 0.15
+
 ## Evaluation thresholds
 MIN_ANSWER_LENGTH = 20
 LOW_RELEVANCE_THRESHOLD = 0.1
@@ -56,7 +59,6 @@ NO_REFERENCES_PENALTY = 0.7
 LOW_RELEVANCE_PENALTY = 0.6
 
 ### Refactored Functions
-
 
 def parse_args():
     """Parse CLI arguments."""
@@ -94,6 +96,13 @@ def parse_args():
         help="LLM to use (default: \"gpt2\")"
     )
 
+    parser.add_argument( # Optional
+        "--similarity",
+        type=float,
+        default=MIN_SIMILARITY_SCORE,
+        help="Minimum similarity score to check against documents, (default: 0.15)"
+    )
+
     args = parser.parse_args()
 
     return args
@@ -117,7 +126,7 @@ def load_model(model_name: str = "gpt2", max_new_tokens=256) -> Pipeline:
         sys.exit(1)
 
 
-def retrieve_documents(question: str, docs: list[dict], top_k: int = 3) -> list[dict]:
+def retrieve_documents(question: str, docs: list[dict], top_k: int = 3, min_similarity: float=MIN_SIMILARITY_SCORE) -> list[dict]:
     """Get top_k documents with positive tidf cosine similarity"""
     # better name, types, default
     # check for positive k
@@ -137,7 +146,7 @@ def retrieve_documents(question: str, docs: list[dict], top_k: int = 3) -> list[
 
     retrieved_docs = []
     for i in ranked_indices:
-        if similarities[i] > 0:
+        if similarities[i] > min_similarity:
             retrieved_docs.append(
                 {
                     "doc": docs[i],
@@ -265,12 +274,12 @@ def main():
     args = parse_args()
 
     # 1. Retrieve relevant documents
-    retrieved_docs = retrieve_documents(question=args.question, docs=RAG_DOCS, top_k=args.top_k)
+    retrieved_docs = retrieve_documents(question=args.question, docs=RAG_DOCS, top_k=args.top_k, min_similarity=MIN_SIMILARITY_SCORE)
 
     # 2. Generate answer
     if len(retrieved_docs) > 0:
         llm = load_model(model_name=args.model)
-        answer = call_model(question=args.question, retreived_docs=retrieved_docs, llm=llm)
+        answer = call_model(question=args.question, retrieved_docs=retrieved_docs, llm=llm)
     else:
         answer = "UNKNOWN: No documents retrieved. Try re-phrasing your question or increasing --top_k"
 
