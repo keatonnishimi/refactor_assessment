@@ -160,9 +160,7 @@ def call_model(question: str, retrieved_docs: list[dict], llm: Pipeline):
     answer = output[0]["generated_text"].strip()
 
     if answer == "":
-        answer = "idk"
-        # need to write better fallback
-        # describing failure modes here
+        answer = "UNKNOWN: Unable to generate answer given retrieved documents. Try re-phrasing your question or increasing --top_k"
 
     return answer
 
@@ -185,7 +183,7 @@ def validate_output(
         score = score * NO_DOCS_PENALTY
         return False, score, problems
 
-    if "idk" in answer.lower():
+    if "UNKNOWN: " in answer.upper():
         problems.append("No information in provided documents.")
         score = score * NO_INFO_PENALTY
 
@@ -267,10 +265,7 @@ def main():
         llm = load_model()
         answer = call_model(args.question, retrieved_docs, llm)
     else:
-        answer = "idk"
-        # need to write a better fallback
-        # this should say something about the exception
-        # that we didn't find docs relevant for whatever reason
+        answer = "UNKNOWN: No documents retrieved. Try re-phrasing your question or increasing --top_k"
 
     # 3. Validate
     is_valid, score, problems = validate_output(answer, retrieved_docs)
