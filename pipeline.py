@@ -55,7 +55,7 @@ def parse_args():
         help="Print the output into json format, (default: False)")
 
     args = parser.parse_args()
-    
+
     return args
 
 
@@ -106,8 +106,6 @@ def call_model(question: str, retrieved_docs: list[dict], llm: Pipeline):
     for counter, retrieved_doc in enumerate(retrieved_docs, start=1):
         doc_text = retrieved_doc["doc"]["txt"]
         context += f"[{counter}] {doc_text}\n\n"
-
-    temp_storage["context"] = context
 
     prompt = (
         f"Context:\n{context}\n"
