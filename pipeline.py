@@ -237,7 +237,20 @@ def print_results(
     problems: list[str],
     use_json=False,
 ):
-    """Display summary and json output"""
+    """Display summary or json output"""
+    if use_json:
+        result = {
+            "answer": answer,
+            "citations": retrieved_docs,
+            "critique": {
+                "valid": is_valid,
+                "score": score,
+                "problems": problems,
+            },
+        }
+        print(json.dumps(result, indent=2))
+        return
+
     print(f"\nQ: {question}")
     print(f"\nA: {answer}\n")
 
@@ -260,17 +273,6 @@ def print_results(
     if len(problems) > 0:
         print(f"Problems: {', '.join(problems)}")
 
-    if use_json:
-        result = {
-            "answer": answer,
-            "citations": retrieved_docs,
-            "critique": {
-                "valid": is_valid,
-                "score": score,
-                "problems": problems,
-            },
-        }
-        print(json.dumps(result, indent=2))
 
 
 def main():
