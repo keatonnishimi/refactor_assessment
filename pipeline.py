@@ -54,13 +54,6 @@ score = 1.0
 is_valid = False
 temp_storage = {"question": args.question}
 
-try:
-    print("loading model...")
-    llm = pipeline("text-generation", model="gpt2", max_new_tokens=256)
-    print("model loaded")
-except:
-    pass
-
 docs = [
     {"id": "1", "txt": "Python is a high-level, interpreted programming language. It was created by Guido van Rossum and first released in 1991. Python emphasizes code readability with its notable use of significant whitespace."},
     {"id": "2", "txt": "FastAPI is a modern, fast web framework for building APIs with Python 3.7+. It is based on standard Python type hints and provides automatic API documentation. FastAPI is one of the fastest Python frameworks available."},
@@ -68,6 +61,17 @@ docs = [
     {"id": "4", "txt": "RAG (Retrieval-Augmented Generation) combines information retrieval with text generation. It retrieves relevant documents from a knowledge base and uses them to generate informed, contextual answers. This approach improves accuracy and reduces hallucinations."},
     {"id": "5", "txt": "Vector databases store data as high-dimensional vectors and enable efficient similarity search. They are essential for modern AI applications, particularly in semantic search and retrieval systems. Common examples include Pinecone, Weaviate, and Chroma."}
 ]
+
+def load_model(model_name: str="gpt2", max_new_tokens=256):
+    """Load model from HuggingFace"""
+    try:
+        print("Loading Model...")
+        llm = pipeline("text-generation", model=model_name, max_new_tokens=max_new_tokens)
+        print("Model Loaded successfully!")
+        return llm
+    except Exception as e:
+        print(f"Error loading model \"{model_name}\": {e}")
+        sys.exit(1)
 
 def retrieve_documents(question: str, docs: list[dict], top_k: int=3) -> list[dict]:
     """Get top_k documents with positive tidf cosine similarity"""
@@ -99,6 +103,9 @@ def retrieve_documents(question: str, docs: list[dict], top_k: int=3) -> list[di
 
 retrieved_docs = retrieve_documents(question=args.question, docs=docs, top_k=args.top_k)
 
+
+
+#probably move most of this into print_results()
 if len(retrieved_docs) == 0:
     answer = "idk"
     problems.append("no docs")
@@ -112,6 +119,9 @@ if len(retrieved_docs) == 0:
     if args.json:
         print(json.dumps({"answer": answer, "citations": retrieved_docs, "critique": {"ok": is_valid, "score": score, "problems": problems}}, indent=2))
     sys.exit(0)
+
+
+
 
 def call_model():
     global answer, temp_storage
@@ -170,6 +180,8 @@ def validate_output():
 
 validate_output()
 
+
+#put all this into print_results()
 print("\nQ: {}".format(args.question))
 print(f"\nA: {answer}\n")
 print("Citations:")
@@ -205,10 +217,18 @@ def main():
     retrieved_docs = retrieve_documents(args.question, docs, top_k=args.top_k)
 
     #2. Generate answer
+    if len(retrieved_docs) > 0:
+        llm = load_model()
+        #call_model(llm)
+    else:
+        answer = "idk"
+        #need to write a better fallback
 
     #3. Validate
+    #validate_output()
 
     #4. Print
+    #print_results()
 
 if __name__ == "__main__":
     main()
